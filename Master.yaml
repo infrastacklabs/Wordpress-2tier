@@ -1,0 +1,51 @@
+heat_template_version: 2013-05-23
+ 
+description: Template that installs a wordpress server and supporting MySQL database running on separate servers
+ 
+parameters:
+  image:
+    type: string
+    default: PaaS_Base_ubuntu
+  flavor:
+    type: string
+    label: Flavor
+    default: m1.small
+  key:
+    type: string
+    label: Key name
+    default: SAN-KEY
+  private_network:
+    type: string
+    label: Private network name or ID
+    default: db-pnw
+  db_server_name:
+    type: string
+    default: db-server
+  app_server_name:
+    type: string 
+    default: app-server
+ 
+resources:
+  mysql:
+    type: Lib::INF::MYSQL
+    properties:
+      server_name: { get_param: db_server_name }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key: { get_param: key }
+      private_network: { get_param: private_network }
+      database_name: wordpress
+      database_user: wordpress_user
+ 
+  wordpress:
+    type: Lib::INF::Wordpress
+    properties:
+      server_name: { get_param: app_server_name }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key: { get_param: key }
+      private_network: { get_param: private_network }
+      mysql_server: { get_attr: [mysql, ip] }
+      database_name: wordpress
+      database_user: wordpress_user
+      database_password: { get_attr: [mysql, database_password] }
