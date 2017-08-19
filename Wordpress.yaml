@@ -18,7 +18,7 @@ parameters:
     label: Key name
     description: Name of key-pair to be installed on the compute instance.
     default: SAN-KEY
-  network:
+  private_network:
     type: string
     label: Private network name or ID
     description: Network to attach server to.
@@ -40,17 +40,14 @@ parameters:
     label: Database password
     hidden: true
     description: Password to access the database.
+  server_name:
+    type: string
+    label: Server Name
+    description: REQUIRED PARAMETER - Name of the instance to spin up.
+    hidden: false
+    default: Web_Server
 
 resources:
-  wait_condition:
-    type: OS::Heat::WaitCondition
-    properties:
-      handle: { get_resource: wh }
-      count: 1
-      timeout: 600
-
-  wh:
-    type: OS::Heat::WaitConditionHandle
 
   security_group:
       type: OS::Neutron::SecurityGroup
@@ -64,13 +61,14 @@ resources:
   port:
     type: OS::Neutron::Port
     properties:
-      network: { get_param: network }
+      network: { get_param: private_network }
       security_groups:
         - { get_resource: security_group }
 
   wordpress_instance:
     type: OS::Nova::Server
     properties:
+      name: { get_param: server_name }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key }
@@ -84,10 +82,9 @@ resources:
             __database_name__: { get_param: database_name }
             __database_user__: { get_param: database_user }
             __database_password__: { get_param: database_password }
-            wc_notify: { get_attr: ['wh', 'curl_cli'] }
           template: |
             #!/bin/bash -ex
-
+            sed -i 's/172.16.*.*/8.8.8.8/g' /etc/resolv.conf
             # install dependencies
             apt-get update
             apt-get -y install apache2 php5 libapache2-mod-php5 php5-mysql php5-gd mysql-client
@@ -110,9 +107,6 @@ resources:
             # give apache ownership of the application files
             chown -R www-data:www-data /var/www/html/
             chmod -R g+w /var/www/html/
-
-            # notify heat that we are done here
-            wc_notify --data-binary '{"status": "SUCCESS"}'
 
 outputs:
   name:
